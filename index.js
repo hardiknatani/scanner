@@ -4,12 +4,9 @@ var fs = require('fs');
 var  https = require('https');
 const cors = require('cors')
 const app = express();
-const Barcode = require('aspose-barcode-cloud-node');
+const DBR = require("dynamsoft-node-barcode");
+DBR.BarcodeReader.license = 't0073oQAAABY7vfDu4Npf86Ja9h3GK3kmUwXPdZJC2uwHYYccxhJMt3L8ne2Pcufo/QcCySnjJnA7yGFtnVbMz9n/DIxz2RIA1WIiUA==';
 
-const config = new Barcode.Configuration(
-"bad8dbe2-6fec-4286-8892-018609ac81e9",
-"65438a072888a5f25be5d6e00a80b81e"
-);
 var options = {
      key: fs.readFileSync('./ssl/code.key'),
      cert: fs.readFileSync('./ssl/code.crt'),
@@ -36,7 +33,6 @@ app.use(bodyParser.urlencoded({ extended: true }))
 app.use(bodyParser.json({limit: '50mb'}))
 app.use(cors())
 
-
 app.post('/scan', async (req, res) => {
 
     const { body } = req;
@@ -50,34 +46,17 @@ app.post('/scan', async (req, res) => {
     const imageBuffer = Buffer.from(base64Data, 'base64');
     const tempFilePath = './temp-image.jpg'; // use any suitable temporary file path
     fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
-    const api = new Barcode.BarcodeApi(config);
 
-    async function recognizeBarcode(api, fileName) {
-        const request = new Barcode.PostBarcodeRecognizeFromUrlOrContentRequest();
-        request.image = fs.readFileSync(fileName);
-        request.type = Barcode.DecodeBarcodeType.Code128;
-        request.preset = Barcode.PresetType.HighPerformance;
-        request.fastScanOnly = false;
-    
-        const result = await api.postBarcodeRecognizeFromUrlOrContent(request);
-    
-        return result.body.barcodes;
-    }
-    
-    recognizeBarcode(api,tempFilePath).then(barcodes => {
-        // console.log('Recognized barcodes are:');
-        // console.log(barcodes);
-        res.send(barcodes[0]);
-        fs.unlink(tempFilePath, (err => {
-            if (err) console.log(err);
-            else {
-              console.log("Deleted file successfully");
-            }
-          }));    })
-        .catch(err => {
-        console.error(JSON.stringify(err, null, 2));
-        res.send(err)
-        });
+    (async()=>{
+        let reader = await DBR.BarcodeReader.createInstance();
+        for(let result of await reader.decode(tempFilePath)){
+            console.log(result.barcodeText);
+        }
+        reader.destroy();
+        
+        await DBR.BarcodeReader._dbrWorker.terminate();
+
+    })();
 
 
 })

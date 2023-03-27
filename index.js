@@ -4,6 +4,7 @@ var fs = require('fs');
 var  https = require('https');
 const cors = require('cors')
 const app = express();
+const path = require('path')
 const Barcode = require('aspose-barcode-cloud-node');
 
 const config = new Barcode.Configuration(
@@ -48,7 +49,7 @@ app.post('/scan', async (req, res) => {
     
     // create a buffer from the base64-encoded string
     const imageBuffer = Buffer.from(base64Data, 'base64');
-    const tempFilePath = './temp-image.jpg'; // use any suitable temporary file path
+    const tempFilePath = path.join('./temp-image.jpg'); // use any suitable temporary file path
     fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
     const api = new Barcode.BarcodeApi(config);
 
@@ -64,11 +65,11 @@ app.post('/scan', async (req, res) => {
         return result.body.barcodes;
     }
     
-    recognizeBarcode(api,tempFilePath).then(barcodes => {
+    recognizeBarcode(api,path.resolve(tempFilePath)).then(barcodes => {
         // console.log('Recognized barcodes are:');
         // console.log(barcodes);
         res.send(barcodes[0]);
-        fs.unlink(tempFilePath, (err => {
+        fs.unlink(path.resolve(tempFilePath), (err => {
             if (err) console.log(err);
             else {
               console.log("Deleted file successfully");

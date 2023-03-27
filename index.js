@@ -2,11 +2,14 @@ const express = require('express')
 var bodyParser = require('body-parser')
 var fs = require('fs');
 var  https = require('https');
-var CloudmersiveBarcodeapiClient = require('cloudmersive-barcodeapi-client');
 const cors = require('cors')
 const app = express();
+const Barcode = require('aspose-barcode-cloud-node');
 
-
+const config = new Barcode.Configuration(
+"bad8dbe2-6fec-4286-8892-018609ac81e9",
+"65438a072888a5f25be5d6e00a80b81e"
+);
 var options = {
      key: fs.readFileSync('./ssl/code.key'),
      cert: fs.readFileSync('./ssl/code.crt'),
@@ -36,9 +39,7 @@ app.use(cors())
 
 app.post('/scan', async (req, res) => {
 
-
     const { body } = req;
-
 
     const base64Image = body.data; // your base64-encoded image
 
@@ -47,32 +48,36 @@ app.post('/scan', async (req, res) => {
     
     // create a buffer from the base64-encoded string
     const imageBuffer = Buffer.from(base64Data, 'base64');
+    const tempFilePath = './temp-image.jpg'; // use any suitable temporary file path
+    fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
+    const api = new Barcode.BarcodeApi(config);
 
-    var defaultClient = CloudmersiveBarcodeapiClient.ApiClient.instance;
+    async function recognizeBarcode(api, fileName) {
+        const request = new Barcode.PostBarcodeRecognizeFromUrlOrContentRequest();
+        request.image = fs.readFileSync(fileName);
+        request.type = Barcode.DecodeBarcodeType.Code128;
+        request.preset = Barcode.PresetType.HighPerformance;
+        request.fastScanOnly = false;
     
-    // Configure API key authorization: Apikey
-    var Apikey = defaultClient.authentications['Apikey'];
-    Apikey.apiKey = '0615b6f5-a989-417b-8f86-55c707a6402e';
+        const result = await api.postBarcodeRecognizeFromUrlOrContent(request);
     
-    var apiInstance = new CloudmersiveBarcodeapiClient.BarcodeScanApi();
-        
+        return result.body.barcodes;
+    }
     
-    var callback = function(error, data, response) {
-      if (error) {
-        console.error(error);
-        res.status(500).send("Internal Server Error")
-      } else {
-                console.log(data)
-        if(data.Successful==true){
-                res.send(data.RawText)
-            }  else if(data.Successful==false){
-                res.send("Invalid Image, Please Try again");
-            }    
-}
-    };
-    apiInstance.barcodeScanImage(imageBuffer, callback);
-
-
+    recognizeBarcode(api,tempFilePath).then(barcodes => {
+        // console.log('Recognized barcodes are:');
+        // console.log(barcodes);
+        res.send(barcodes[0]);
+        fs.unlink(tempFilePath, (err => {
+            if (err) console.log(err);
+            else {
+              console.log("Deleted file successfully");
+            }
+          }));    })
+        .catch(err => {
+        console.error(JSON.stringify(err, null, 2));
+        res.send(err)
+        });
 
 
 })
